@@ -1,4 +1,4 @@
-<!-- <!DOCTYPE html>
+<!DOCTYPE html>
 <html>
 <head>
   <title>Live Flight Tracker</title>
@@ -37,7 +37,7 @@
     }
 
     async function loadFlights() {
-      const res = await fetch("https://flights-vfpi.onrender.com/api/flights");
+      const res = await fetch("https://flights-xauw.onrender.com/api/flights");
       const data = await res.json();
 
       flightLayer.clearLayers();
@@ -85,128 +85,6 @@
     loadFlights();
     setInterval(loadFlights, 5000);
   </script>
-</body>
-</html> -->
-
-<!doctype html>
-<html>
-<head>
-  <meta charset="utf-8" />
-  <title>Live Flights</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <link rel="stylesheet" href="styles.css" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-</head>
-<body>
-  <div id="sidebar">
-    <h1>Live Flights</h1>
-    <input id="search" placeholder="Search callsign or country..." />
-    <button id="toggle">Toggle Dark/Light</button>
-    <div id="flight-list"></div>
-  </div>
-  <div id="map"></div>
-
-<script>
-const API_BASE = window.API_BASE || "https://flights-vfpi.onrender.com"; // change if needed
-
-const map = L.map("map").setView([20, 0], 2);
-
-L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 18 }).addTo(map);
-
-const flightLayer = L.layerGroup().addTo(map);
-const markers = {}; // keyed by icao24
-
-function planeIcon(rotation=0){
-  return L.divIcon({
-    className: "plane-marker",
-    html: `<img src="https://img.icons8.com/ios-filled/50/000000/airplane-take-off.png" style="width:22px;height:22px;transform:rotate(${rotation}deg);">`,
-    iconSize: [22,22],
-    iconAnchor: [11,11]
-  });
-}
-
-function smoothMove(marker, lat, lng){
-  try{
-    marker.setLatLng([lat,lng]);
-  }catch(e){}
-}
-
-async function loadFlights(){
-  try {
-    // const res = await fetch("https://flights-xauw.onrender.com/api/flights");
-    const BACKEND_URL = "https://flights-xauw.onrender.com"; // your Render URL
-async function loadFlights() {
-  try {
-    const res = await fetch(`${BACKEND_URL}/api/flights`);
-    if (!res.ok) {
-      throw new Error(`Backend returned ${res.status}`);
-    }
-    const data = await res.json();
-    console.log("DATA RECEIVED", data.source, data.count);
-    // ... use data.flights (same shape as earlier)
-  } catch (err) {
-    console.error("Failed to load flights:", err);
-    // optionally fall back to static mock client-side
-  }
-}
-    const data = await res.json();
-
-    if (!data || !data.flights) {
-      console.warn("No flights in response");
-      return;
-    }
-    // Clear sidebar
-    document.getElementById("flight-list").innerHTML = "";
-
-    // Remove markers that disappeared
-    const active = new Set(data.flights.map(f => f.icao24));
-    for (const id in markers) if (!active.has(id)) {
-      flightLayer.removeLayer(markers[id]);
-      delete markers[id];
-    }
-
-    data.flights.forEach(f => {
-      if (f.latitude == null || f.longitude == null) return;
-      const id = f.icao24 || (f.callsign || Math.random()).toString();
-
-      if (markers[id]) {
-        smoothMove(markers[id], f.latitude, f.longitude);
-        // rotate
-        const img = markers[id]._icon && markers[id]._icon.querySelector("img");
-        if (img) img.style.transform = `rotate(${f.heading||0}deg)`;
-      } else {
-        const marker = L.marker([f.latitude, f.longitude], { icon: planeIcon(f.heading || 0) })
-          .bindPopup(`<b>${f.callsign || "N/A"}</b><br>${f.origin_country || ""}<br>Alt: ${Math.round(f.baro_altitude||0)}m`)
-          .addTo(flightLayer);
-        markers[id] = marker;
-      }
-
-      // sidebar entry
-      const list = document.getElementById("flight-list");
-      const el = document.createElement("div");
-      el.className="flight-card";
-      el.innerHTML = `<div class="flight-title">${f.callsign||"Unknown"} - ${f.origin_country||""}</div>
-                      <div class="flight-coords">Lat: ${f.latitude.toFixed(2)}, Lon: ${f.longitude.toFixed(2)}</div>`;
-      el.onclick = () => {
-        map.flyTo([f.latitude, f.longitude], 6);
-        markers[id].openPopup();
-      };
-      list.appendChild(el);
-    });
-
-  } catch (err) {
-    console.error("Failed to load flights:", err);
-  }
-}
-
-loadFlights();
-setInterval(loadFlights, 4000);
-
-document.getElementById("toggle").addEventListener("click", () => {
-  document.body.classList.toggle("dark");
-});
-</script>
 </body>
 </html>
 
