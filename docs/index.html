@@ -134,7 +134,22 @@ function smoothMove(marker, lat, lng){
 
 async function loadFlights(){
   try {
-    const res = await fetch("https://flights-xauw.onrender.com/api/flights");
+    // const res = await fetch("https://flights-xauw.onrender.com/api/flights");
+    const BACKEND_URL = "https://flights-xauw.onrender.com"; // your Render URL
+async function loadFlights() {
+  try {
+    const res = await fetch(`${BACKEND_URL}/api/flights`);
+    if (!res.ok) {
+      throw new Error(`Backend returned ${res.status}`);
+    }
+    const data = await res.json();
+    console.log("DATA RECEIVED", data.source, data.count);
+    // ... use data.flights (same shape as earlier)
+  } catch (err) {
+    console.error("Failed to load flights:", err);
+    // optionally fall back to static mock client-side
+  }
+}
     const data = await res.json();
 
     if (!data || !data.flights) {
@@ -194,3 +209,4 @@ document.getElementById("toggle").addEventListener("click", () => {
 </script>
 </body>
 </html>
+
