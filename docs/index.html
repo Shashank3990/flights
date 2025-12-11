@@ -41,6 +41,14 @@
     async function loadFlights() {
       const res = await fetch("https://flights-vfpi.onrender.com/api/flights");
       const data = await res.json();
+      let bounds = [];
+data.flights.forEach(f => {
+    bounds.push([f.latitude, f.longitude]);
+});
+
+if (bounds.length > 0) {
+    map.fitBounds(bounds);
+}
 
       flightLayer.clearLayers();
       document.getElementById("flight-list").innerHTML = "";
@@ -89,6 +97,7 @@
   </script>
 </body>
 </html>
+
 
 
 
