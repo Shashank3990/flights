@@ -1,143 +1,91 @@
-// const express = require("express");
-// const axios = require("axios");
-// const cors = require("cors");
-
-// const app = express();
-// app.use(cors());
-
-// app.get("/api/flights", async (req, res) => {
-//   try {
-//     const response = await axios.get(
-//       "https://opensky-network.org/api/states/all"
-//     );
-
-//     const states = response.data.states || [];
-
-//     const flights = states
-//       .map(f => ({
-//         icao24: f[0],
-//         callsign: f[1]?.trim() || "Unknown",
-//         origin_country: f[2],
-//         last_contact: f[4],
-//         longitude: f[5],
-//         latitude: f[6],
-//         baro_altitude: f[7],
-//         on_ground: f[8],
-//         velocity: f[9],
-//         heading: f[10],
-//         vertical_rate: f[11]
-//       }))
-//       .filter(f => f.latitude && f.longitude);
-
-//     res.json({ count: flights.length, flights });
-//   } catch (error) {
-//     console.error(error);
-//     res.status(500).json({ error: "Unable to get live flight data" });
-//   }
-// });
-
-// app.listen(5000, () => console.log("API running on http://localhost:5000"));
-
 // server.js
+require('dotenv').config(); // if using a .env file locally
 const express = require("express");
 const axios = require("axios");
 const cors = require("cors");
 
 const app = express();
-
-// Allow CORS from any origin (safe for demo). On prod restrict origin as needed.
 app.use(cors());
-app.use(express.json());
 
-// Config from env
+const TOKEN_URL = "https://auth.opensky-network.org/auth/realms/opensky-network/protocol/openid-connect/token";
+const API_URL = "https://opensky-network.org/api/states/all";
+
 const OPENSKY_USER = process.env.OPENSKY_USER || "";
 const OPENSKY_PASS = process.env.OPENSKY_PASS || "";
-const PORT = parseInt(process.env.PORT || "5000", 10);
 
-// Helper: generate N mock flights worldwide (random)
-function generateMockFlights(n = 200) {
-  const flights = [];
-  for (let i = 0; i < n; i++) {
-    const lat = (Math.random() * 180 - 90).toFixed(6);   // -90..+90
-    const lon = (Math.random() * 360 - 180).toFixed(6);  // -180..+180
-    const callsign = `MOCK${100 + i}`;
-    const origin_country = ["USA","France","India","UAE","Brazil","Thailand","Spain"][Math.floor(Math.random()*7)];
-    flights.push({
-      icao24: `mock${i}`,
-      callsign,
-      origin_country,
-      latitude: parseFloat(lat),
-      longitude: parseFloat(lon),
-      baro_altitude: Math.round(Math.random()*12000),
-      velocity: Math.round(Math.random()*300),
-      heading: Math.round(Math.random()*360),
-      last_contact: Math.floor(Date.now()/1000)
-    });
+// simple in-memory token cache
+let tokenCache = {
+  token: null,
+  expiresAt: 0
+};
+
+async function getAccessToken() {
+  const now = Date.now();
+  if (tokenCache.token && tokenCache.expiresAt > now + 5000) { // slight buffer
+    return tokenCache.token;
   }
-  return flights;
+
+  if (!CLIENT_ID || !CLIENT_SECRET) {
+    throw new Error("Missing OpenSky client credentials (OPENSKY_CLIENT_ID / OPENSKY_CLIENT_SECRET).");
+  }
+
+  const params = new URLSearchParams();
+  params.append("grant_type", "client_credentials");
+  params.append("client_id", CLIENT_ID);
+  params.append("client_secret", CLIENT_SECRET);
+
+  const resp = await axios.post(TOKEN_URL, params.toString(), {
+    headers: { "Content-Type": "application/x-www-form-urlencoded" }
+  });
+
+  const data = resp.data;
+  // typical response: { access_token: "...", token_type: "bearer", expires_in: 1800, ... }
+  tokenCache.token = data.access_token;
+  tokenCache.expiresAt = Date.now() + (data.expires_in || 1800) * 1000;
+  return tokenCache.token;
 }
 
-// Route: /api/flights
 app.get("/api/flights", async (req, res) => {
   try {
-    // If user provided OpenSky credentials try to fetch from OpenSky REST
-    if (OPENSKY_USER && OPENSKY_PASS) {
-      const url = "https://opensky-network.org/api/states/all";
-      const auth = {
-        username: OPENSKY_USER,
-        password: OPENSKY_PASS
-      };
+    // obtain token
+    const token = await getAccessToken();
 
-      // fetch states
-      const resp = await axios.get(url, { auth, timeout: 10000 });
+    // optional: you can pass bounding box params like ?lamin=..&lomin=..&lamax=..&lomax=..
+    const response = await axios.get(API_URL, {
+      headers: {
+        Authorization: `Bearer ${token}`
+      },
+      params: {
+        // example: you can forward user's query params to filter area
+        // lamin: req.query.lamin, lomin: req.query.lomin, lamax: req.query.lamax, lomax: req.query.lomax
+      },
+      timeout: 10000
+    });
 
-      // OpenSky returns { time, states: [ ... ] } where each state is an array
-      const states = resp.data && resp.data.states ? resp.data.states : [];
+    const states = response.data.states || [];
 
-      // Map to our flight objects (defensive checks)
-      const flights = states
-        .filter(s => s && typeof s === "object" && s.length >= 7)
-        .map(f => ({
-          icao24: f[0],
-          callsign: (f[1] || "").trim() || null,
-          origin_country: f[2] || null,
-          last_contact: f[4] || null,
-          longitude: f[5] !== null ? parseFloat(f[5]) : null,
-          latitude: f[6] !== null ? parseFloat(f[6]) : null,
-          baro_altitude: f[7] || null,
-          on_ground: f[8] || null,
-          velocity: f[9] || null,
-          heading: f[10] || null,
-          vertical_rate: f[11] || null
-        }))
-        .filter(f => f.latitude !== null && f.longitude !== null);
+    const flights = states
+      .map(f => ({
+        icao24: f[0],
+        callsign: (f[1] || "").trim() || "Unknown",
+        origin_country: f[2],
+        last_contact: f[4],
+        longitude: f[5],
+        latitude: f[6],
+        baro_altitude: f[7],
+        on_ground: f[8],
+        velocity: f[9],
+        heading: f[10],
+        vertical_rate: f[11]
+      }))
+      .filter(f => f.latitude && f.longitude);
 
-      // If OpenSky returned zero flights (rare) fall back to mock
-      if (!flights || flights.length === 0) {
-        console.warn("OpenSky returned 0 flights -> using mock set");
-        return res.json({ source: "mock", count: 0, flights: generateMockFlights(200) });
-      }
-
-      return res.json({ source: "opensky", count: flights.length, flights });
-    }
-
-    // No credentials -> return global mock flights
-    const mock = generateMockFlights(300);
-    res.json({ source: "mock", count: mock.length, flights: mock });
-  } catch (err) {
-    console.error("Backend Error:", err.message || err);
-    // On failure return mock flights so frontend still works
-    const mock = generateMockFlights(200);
-    res.status(200).json({ source: "fallback-mock", error: err.message || "open-sky fetch failed", count: mock.length, flights: mock });
+    res.json({ count: flights.length, flights });
+  } catch (error) {
+    console.error("API error:", error?.response?.status, error?.response?.data || error.message);
+    res.status(500).json({ error: "Unable to get live flight data" });
   }
 });
 
-// health
-app.get("/api/health", (_, res) => res.json({ ok: true }));
-
-// serve basic message at root (optional)
-app.get("/", (_, res) => res.send("Flight backend running"));
-
-app.listen(PORT, () => console.log(`API running on port ${PORT}`));
-
-
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => console.log(`API running on http://localhost:${PORT}`));
