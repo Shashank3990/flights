@@ -43,7 +43,7 @@
       flightLayer.clearLayers();
       document.getElementById("flight-list").innerHTML = "";
 
-      data.flights.forEach(f => {
+      data.flights.forEach (f => {
         // Create plane marker
         const marker = L.marker([f.latitude, f.longitude], {
           icon: planeIcon(f.heading),
@@ -87,3 +87,4 @@
   </script>
 </body>
 </html>
+
