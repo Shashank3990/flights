@@ -1,0 +1,116 @@
+<!-- <!DOCTYPE html>
+<html>
+<head>
+  <title>Live Flight Tracker</title>
+
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+</head>
+<body>
+  <div id="sidebar">
+    <h2>Live Flights</h2>
+    <div id="flight-list"></div>
+  </div>
+
+  <div id="map"></div>
+
+  <script>
+    const map = L.map("map").setView([20, 78], 4); // India center
+
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 18,
+    }).addTo(map);
+
+    const flightLayer = L.layerGroup().addTo(map);
+    let selectedMarker = null;
+
+    // Custom plane icon
+    function planeIcon(rotation) {
+      return L.icon({
+        iconUrl: "https://img.icons8.com/ios-filled/50/airplane-take-off.png",
+        iconSize: [30, 30],
+        className: "plane-icon",
+        iconAnchor: [15, 15],
+      });
+    }
+
+    async function loadFlights() {
+      const res = await fetch("https://flights-vfpi.onrender.com/api/flights");
+      const data = await res.json();
+
+      flightLayer.clearLayers();
+      document.getElementById("flight-list").innerHTML = "";
+
+      data.flights.forEach (f => {
+        // Create plane marker
+        const marker = L.marker([f.latitude, f.longitude], {
+          icon: planeIcon(f.heading),
+          rotationAngle: f.heading,
+          rotationOrigin: "center",
+        });
+
+        // Popup info
+        marker.bindPopup(`
+          <div class="popup">
+            <b>Callsign:</b> ${f.callsign}<br>
+            <b>Country:</b> ${f.origin_country}<br>
+            <b>Altitude:</b> ${Math.round(f.baro_altitude)} m<br>
+            <b>Speed:</b> ${Math.round(f.velocity)} m/s<br>
+            <b>Heading:</b> ${Math.round(f.heading)}°<br>
+          </div>
+        `);
+
+        marker.addTo(flightLayer);
+
+        // List item in sidebar
+        const item = document.createElement("div");
+        item.className = "flight-item";
+        item.innerHTML = `
+          <b>${f.callsign}</b> - ${f.origin_country}<br>
+          Lat: ${f.latitude.toFixed(2)}, Lon: ${f.longitude.toFixed(2)}
+        `;
+
+        // Click on sidebar → highlight plane
+        item.onclick = () => {
+          map.flyTo([f.latitude, f.longitude], 8);
+          marker.openPopup();
+        };
+
+        document.getElementById("flight-list").appendChild(item);
+      });
+    }
+
+    loadFlights();
+    setInterval(loadFlights, 5000);
+  </script>
+</body>
+</html> -->
+
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Mock Live Flight Tracker</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+</head>
+<body>
+  <div id="sidebar">
+    <h1>Live Flights</h1>
+
+    <input id="search" placeholder="Search callsign or country..." />
+
+    <button id="toggle-theme" class="btn">Toggle Dark/Light</button>
+
+    <div id="flight-list" class="list"></div>
+  </div>
+
+  <div id="map"></div>
+
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
