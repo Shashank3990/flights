@@ -72,25 +72,40 @@ function mapOpenSkyState(s) {
 }
 
 /** Generate mock flights so frontend always has data (helpful for testing & no-API mode) */
-function generateMockFlights(center = { lat: 20, lon: 78 }, count = 40) {
-  const flights = [];
-  for (let i = 0; i < count; i++) {
-    const jitterLat = (Math.random() - 0.5) * 6; // +/-3°
-    const jitterLon = (Math.random() - 0.5) * 6;
-    flights.push({
-      icao24: "mock" + i.toString(36),
-      callsign: "MOCK" + (100 + i),
-      origin_country: ["India", "USA", "France", "UAE", "Thailand"][Math.floor(Math.random()*5)],
-      last_contact: Date.now() / 1000,
-      latitude: +(center.lat + jitterLat).toFixed(6),
-      longitude: +(center.lon + jitterLon).toFixed(6),
-      baro_altitude: Math.round(1000 + Math.random() * 10000),
-      on_ground: false,
-      velocity: +(100 + Math.random()*200).toFixed(1),
-      heading: Math.round(Math.random()*360),
-      vertical_rate: 0
-    });
-  }
+// function generateMockFlights(center = { lat: 20, lon: 78 }, count = 40) {
+//   const flights = [];
+//   for (let i = 0; i < count; i++) {
+//     const jitterLat = (Math.random() - 0.5) * 6; // +/-3°
+//     const jitterLon = (Math.random() - 0.5) * 6;
+//     flights.push({
+//       icao24: "mock" + i.toString(36),
+//       callsign: "MOCK" + (100 + i),
+//       origin_country: ["India", "USA", "France", "UAE", "Thailand"][Math.floor(Math.random()*5)],
+//       last_contact: Date.now() / 1000,
+//       latitude: +(center.lat + jitterLat).toFixed(6),
+//       longitude: +(center.lon + jitterLon).toFixed(6),
+//       baro_altitude: Math.round(1000 + Math.random() * 10000),
+//       on_ground: false,
+//       velocity: +(100 + Math.random()*200).toFixed(1),
+//       heading: Math.round(Math.random()*360),
+//       vertical_rate: 0
+//     });
+//   }
+function randomFlight(id) {
+    return {
+        icao24: "MOCK" + id,
+        callsign: "FL-" + id,
+        origin_country: ["USA", "France", "India", "UAE", "Japan", "UK"][Math.floor(Math.random() * 6)],
+        
+        // WORLDWIDE Lat–Lon 🌍
+        latitude: (Math.random() * 180 - 90).toFixed(2),    // -90 to 90
+        longitude: (Math.random() * 360 - 180).toFixed(2), // -180 to 180
+        
+        velocity: (Math.random() * 900).toFixed(1),
+        heading: (Math.random() * 360).toFixed(1),
+        baro_altitude: (Math.random() * 12000).toFixed(0)
+    };
+}
   return flights;
 }
 
@@ -142,4 +157,5 @@ app.get("/health", (req, res) => res.json({ ok: true }));
 app.listen(PORT, () => {
   console.log(`Server listening on port ${PORT} (env OPENSKY_USER ${OPENSKY_USER ? "SET" : "NOT SET"})`);
 });
+
 
