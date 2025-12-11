@@ -1,4 +1,4 @@
-/* body {
+body {
   margin: 0;
   font-family: Arial, sans-serif;
   display: flex;
@@ -41,18 +41,5 @@
 
 .plane-icon {
   transform: rotate(var(--rotation, 0deg));
-} */
-
-:root{
-  --bg:#111; --panel:#1f1f1f; --text:#fff;
 }
-body{ margin:0; font-family:Arial; display:flex; height:100vh; background:var(--bg); color:var(--text); }
-#sidebar{ width:320px; padding:18px; background:var(--panel); overflow:auto; box-sizing:border-box;}
-#map{flex:1}
-h1{ text-align:center; color:#00c8ff;}
-#search{ width:100%; padding:10px; margin-bottom:12px; border-radius:8px; border:1px solid #ddd; }
-#toggle{ width:100%; padding:12px; background:#0aa1ff; color:#fff; border:none; border-radius:8px; margin-bottom:12px; cursor:pointer; }
-.flight-card{ background:rgba(255,255,255,0.05); padding:10px; margin-bottom:8px; border-radius:8px; cursor:pointer;}
-.flight-title{ font-weight:bold;}
-.plane-marker img{ transition: transform .4s linear; filter: invert(0) }
-body.dark{ --bg:#111; --panel:#222; }
+
