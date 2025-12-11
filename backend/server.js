@@ -44,31 +44,31 @@ const axios = require("axios");
 const cors = require("cors");
 
 const app = express();
+
+// Allow CORS from any origin (safe for demo). On prod restrict origin as needed.
 app.use(cors());
 app.use(express.json());
 
-// Read credentials from env (set these in Render environment variables)
+// Config from env
 const OPENSKY_USER = process.env.OPENSKY_USER || "";
 const OPENSKY_PASS = process.env.OPENSKY_PASS || "";
+const PORT = parseInt(process.env.PORT || "5000", 10);
 
-/**
- * Generate N random global mock flights (latitude range -85..85, lon -180..180).
- * This ensures the frontend can show worldwide flights when the real API fails.
- */
+// Helper: generate N mock flights worldwide (random)
 function generateMockFlights(n = 200) {
-  const countries = ["USA", "India", "France", "UAE", "Thailand", "Brazil", "Spain", "Australia"];
   const flights = [];
   for (let i = 0; i < n; i++) {
-    const lat = (Math.random() * 170 - 85).toFixed(5);
-    const lon = (Math.random() * 360 - 180).toFixed(5);
+    const lat = (Math.random() * 180 - 90).toFixed(6);   // -90..+90
+    const lon = (Math.random() * 360 - 180).toFixed(6);  // -180..+180
+    const callsign = `MOCK${100 + i}`;
+    const origin_country = ["USA","France","India","UAE","Brazil","Thailand","Spain"][Math.floor(Math.random()*7)];
     flights.push({
-      icao24: `MOCK${1000 + i}`,
-      callsign: `MOCK${100 + i}`,
-      origin_country: countries[Math.floor(Math.random()*countries.length)],
-      longitude: parseFloat(lon),
+      icao24: `mock${i}`,
+      callsign,
+      origin_country,
       latitude: parseFloat(lat),
+      longitude: parseFloat(lon),
       baro_altitude: Math.round(Math.random()*12000),
-      on_ground: false,
       velocity: Math.round(Math.random()*300),
       heading: Math.round(Math.random()*360),
       last_contact: Math.floor(Date.now()/1000)
@@ -77,58 +77,67 @@ function generateMockFlights(n = 200) {
   return flights;
 }
 
+// Route: /api/flights
 app.get("/api/flights", async (req, res) => {
   try {
-    // OpenSky states/all endpoint
-    // Note: OpenSky uses HTTP Basic Auth (username + password)
-    const url = "https://opensky-network.org/api/states/all";
+    // If user provided OpenSky credentials try to fetch from OpenSky REST
+    if (OPENSKY_USER && OPENSKY_PASS) {
+      const url = "https://opensky-network.org/api/states/all";
+      const auth = {
+        username: OPENSKY_USER,
+        password: OPENSKY_PASS
+      };
 
-    const auth = (OPENSKY_USER && OPENSKY_PASS) ? {
-      auth: { username: OPENSKY_USER, password: OPENSKY_PASS },
-      timeout: 8000
-    } : { timeout: 8000 };
+      // fetch states
+      const resp = await axios.get(url, { auth, timeout: 10000 });
 
-    // Try fetching from OpenSky
-    const response = await axios.get(url, auth);
+      // OpenSky returns { time, states: [ ... ] } where each state is an array
+      const states = resp.data && resp.data.states ? resp.data.states : [];
 
-    // Response structure: { time:..., states: [ [...], ... ] }
-    const states = (response.data && response.data.states) || [];
+      // Map to our flight objects (defensive checks)
+      const flights = states
+        .filter(s => s && typeof s === "object" && s.length >= 7)
+        .map(f => ({
+          icao24: f[0],
+          callsign: (f[1] || "").trim() || null,
+          origin_country: f[2] || null,
+          last_contact: f[4] || null,
+          longitude: f[5] !== null ? parseFloat(f[5]) : null,
+          latitude: f[6] !== null ? parseFloat(f[6]) : null,
+          baro_altitude: f[7] || null,
+          on_ground: f[8] || null,
+          velocity: f[9] || null,
+          heading: f[10] || null,
+          vertical_rate: f[11] || null
+        }))
+        .filter(f => f.latitude !== null && f.longitude !== null);
 
-    // Map states array to nicer objects and filter out invalid positions
-    const flights = states
-      .map(s => ({
-        icao24: s[0],
-        callsign: (s[1] || "").trim(),
-        origin_country: s[2],
-        last_contact: s[4],
-        longitude: s[5],
-        latitude: s[6],
-        baro_altitude: s[7],
-        on_ground: s[8],
-        velocity: s[9],
-        heading: s[10],
-        vertical_rate: s[11]
-      }))
-      .filter(f => f.latitude !== null && f.longitude !== null); // only include valid coords
+      // If OpenSky returned zero flights (rare) fall back to mock
+      if (!flights || flights.length === 0) {
+        console.warn("OpenSky returned 0 flights -> using mock set");
+        return res.json({ source: "mock", count: 0, flights: generateMockFlights(200) });
+      }
 
-    // If no flights returned (rare), fallback to mock
-    if (!flights.length) {
-      console.warn("OpenSky returned 0 flights → returning mock data");
-      return res.json({ count: 0, flights: generateMockFlights(400) });
+      return res.json({ source: "opensky", count: flights.length, flights });
     }
 
-    res.json({ count: flights.length, flights });
+    // No credentials -> return global mock flights
+    const mock = generateMockFlights(300);
+    res.json({ source: "mock", count: mock.length, flights: mock });
   } catch (err) {
-    console.error("OpenSky API Error:", err && err.message ? err.message : err);
-
-    // If OpenSky returns 401, 403, 429, etc, return mock global data instead of failing
-    const fallback = generateMockFlights(500);
-    return res.status(200).json({ count: fallback.length, flights: fallback, mocked: true, error: String(err && err.message) });
+    console.error("Backend Error:", err.message || err);
+    // On failure return mock flights so frontend still works
+    const mock = generateMockFlights(200);
+    res.status(200).json({ source: "fallback-mock", error: err.message || "open-sky fetch failed", count: mock.length, flights: mock });
   }
 });
 
-// Serve a minimal health route
-app.get("/", (_req, res) => res.send("Flight backend running"));
+// health
+app.get("/api/health", (_, res) => res.json({ ok: true }));
 
-const PORT = process.env.PORT || 5000;
+// serve basic message at root (optional)
+app.get("/", (_, res) => res.send("Flight backend running"));
+
 app.listen(PORT, () => console.log(`API running on port ${PORT}`));
+
+
